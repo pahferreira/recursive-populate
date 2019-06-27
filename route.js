@@ -129,8 +129,8 @@ router.put('/update/:id', async (req, res) => {
             oldParent.children.splice(index, 1)
             newParent.children.push(screenUpdated._id)
             await oldParent.save()
+            await newParent.save()
           }
-          await newParent.save()
         }
         res.json(screenUpdated)
       }
