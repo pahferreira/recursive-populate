@@ -1,6 +1,6 @@
 import express from 'express'
 import Screen from './model'
-import Map from './modelMap'
+import Device from './modelDevice'
 
 const router = express.Router()
 
@@ -23,6 +23,10 @@ router.get('/:id', (req, res) => {
       res.json(user)
     })
   })
+})
+
+router.get('/device/:id', (req, res) => {
+  Device.findById(req.params.id).then(device => res.json(device))
 })
 
 const createScreen = async (screen, parent) => {
@@ -51,16 +55,23 @@ const createScreen = async (screen, parent) => {
 }
 
 router.post('/createMap', async (req, res) => {
-  const { title, description } = req.body
+  const { titleDevice, descriptionDevice } = req.body
+  const { title, description } = req.body.map
   let rootScreen = new Screen({
     title,
     description
   })
   rootScreen = await rootScreen.save()
-  await req.body.children.forEach(async screen => {
+  let device = new Device({
+    title: titleDevice,
+    description: descriptionDevice,
+    map: rootScreen
+  })
+  await device.save()
+  await req.body.map.children.forEach(async screen => {
     await createScreen(screen, rootScreen)
   })
-  res.json(rootScreen)
+  res.json(device)
 })
 
 router.post('/createOne', async (req, res) => {
@@ -76,35 +87,55 @@ router.post('/createOne', async (req, res) => {
     .catch(err => console.log(err))
 })
 
+const deleteScreen = async screen => {
+  if (screen.children.length) {
+    screen.children.forEach(child => {
+      deleteScreen(child)
+    })
+  }
+  await Screen.findByIdAndRemove(screen._id)
+}
+
+router.delete('/delete/:id', async (req, res) => {
+  Screen.findById(req.params.id).then(async screen => {
+    await deleteScreen(screen)
+    res.json(screen)
+  })
+})
+
 router.put('/update/:id', async (req, res) => {
-  const newParentId = req.body.parent
+  if (req.params.id === req.body.parent) {
+    return res.status(400).json({ error: 'pode não po' })
+  }
   const oldParentId = (await Screen.findById(req.params.id)).parent
-  const screenUpdated = await Screen.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    {
-      useFindAndModify: true,
-      new: true
+  Screen.findById(req.body.parent || oldParentId).then(
+    async newParentConfirm => {
+      if (newParentConfirm) {
+        const screenUpdated = await Screen.findByIdAndUpdate(
+          req.params.id,
+          req.body,
+          {
+            useFindAndModify: true,
+            new: true
+          }
+        )
+        if (req.body.parent) {
+          const newParentId = req.body.parent
+          const newParent = await Screen.findById(newParentId)
+
+          if (oldParentId != newParentId) {
+            const oldParent = await Screen.findById(oldParentId)
+            const index = oldParent.children.indexOf(screenUpdated._id)
+            oldParent.children.splice(index, 1)
+            newParent.children.push(screenUpdated._id)
+            await oldParent.save()
+          }
+          await newParent.save()
+        }
+        res.json(screenUpdated)
+      }
     }
   )
-  const newParent = await Screen.findById(newParentId)
-  if (oldParentId == '') {
-    newParent.children.push(screenUpdated._id)
-    await newParent.save()
-  }
-  if (newParentId == oldParentId) {
-    if (!newParent.children.includes(screenUpdated._id)) {
-      newParent.children.push(screenUpdated._id)
-    }
-  } else {
-    const oldParent = await Screen.findById(oldParentId)
-    const index = oldParent.children.indexOf(screenUpdated._id)
-    oldParent.children.splice(index, 1)
-    newParent.children.push(screenUpdated._id)
-    await oldParent.save()
-  }
-  await newParent.save()
-  res.json(screenUpdated)
 })
 
 export default router
