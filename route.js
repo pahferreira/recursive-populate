@@ -55,19 +55,19 @@ const createScreen = async (screen, parent) => {
 }
 
 router.post('/createMap', async (req, res) => {
-  const { titleDevice, descriptionDevice } = req.body
+  // const { titleDevice, descriptionDevice } = req.body
   const { title, description } = req.body.map
   let rootScreen = new Screen({
     title,
     description
   })
   rootScreen = await rootScreen.save()
-  let device = new Device({
-    title: titleDevice,
-    description: descriptionDevice,
-    map: rootScreen
-  })
-  await device.save()
+  // let device = new Device({
+  //   title: titleDevice,
+  //   description: descriptionDevice,
+  //   map: rootScreen
+  // })
+  // await device.save()
   await req.body.map.children.forEach(async screen => {
     await createScreen(screen, rootScreen)
   })
